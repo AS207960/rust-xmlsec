@@ -806,8 +806,15 @@ PxqqTMVahAuXBHdDexvSk3tLpxbzhgfTYS4aGbGKTamnhkby66S9Ct1ugrWXg5xzNFDHMBkg6d+w
 kO9N4axmKDI4W6XWtxTRifLySfnklNqn20MEF1PstW18lwkKCAninmVorqil5MKoXKjuFrBJv06u
 3JTAEGYtBo4aAIrQFJlAIEUV4H0jbYAKo+drHEA86yqE</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature><saml2p:Status><saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></saml2p:Status><saml2:Assertion xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion" ID="_3381066a8dfd537274b2f43fea8bec4c" IssueInstant="2021-07-29T12:34:42.465Z" Version="2.0"><saml2:Issuer>https://accounts.google.com/o/saml2?idpid=C01n8o8t6</saml2:Issuer><saml2:Subject><saml2:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">q@as207960.net</saml2:NameID><saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml2:SubjectConfirmationData InResponseTo="test" NotOnOrAfter="2021-07-29T12:39:42.465Z" Recipient="https://as207960-neptune.eu.ngrok.io/saml2/assertion_consumer"/></saml2:SubjectConfirmation></saml2:Subject><saml2:Conditions NotBefore="2021-07-29T12:29:42.465Z" NotOnOrAfter="2021-07-29T12:39:42.465Z"><saml2:AudienceRestriction><saml2:Audience>https://neptune.as207960.net/entity</saml2:Audience></saml2:AudienceRestriction></saml2:Conditions><saml2:AuthnStatement AuthnInstant="2021-07-28T21:51:07.000Z" SessionIndex="_3381066a8dfd537274b2f43fea8bec4c"><saml2:AuthnContext><saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:unspecified</saml2:AuthnContextClassRef></saml2:AuthnContext></saml2:AuthnStatement></saml2:Assertion></saml2p:Response>"##;
 
-        let verified = super::decode_and_verify_signed_document(source_xml).unwrap();
-        println!("{:#?}", verified);
-        assert_eq!(verified.references.len(), 1);
+        let output = super::decode_and_verify_signed_document(source_xml).unwrap();
+        println!("{:#?}", output);
+
+        if let super::Output::Verified {
+            references,
+            pkey: _,
+        } = output
+        {
+            assert_eq!(references.len(), 1);
+        }
     }
 }
