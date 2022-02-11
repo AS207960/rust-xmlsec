@@ -1,3 +1,6 @@
+use std::borrow::Cow;
+use std::cmp;
+
 fn canon_attr_map<'a>(a: &'a xml::attribute::OwnedAttribute) -> (xml::name::Name<'a>, String) {
     let attribute_re = regex::Regex::new(r"[ \r\n\t]").unwrap();
 
@@ -19,25 +22,26 @@ pub fn canonical_rfc3076(
     exclusive: bool,
 ) -> Result<String, String> {
     let mut output = Vec::new();
-    let mut output_writer = xml::writer::EventWriter::new_with_config(
-        &mut output,
-        xml::writer::EmitterConfig {
-            perform_indent: false,
-            perform_escaping: false,
-            write_document_declaration: false,
-            autopad_comments: false,
-            cdata_to_characters: true,
-            line_separator: std::borrow::Cow::Borrowed("\n"),
-            normalize_empty_elements: false,
-            ..std::default::Default::default()
-        },
-    );
+
+    let emitter_config = xml::writer::EmitterConfig {
+        perform_indent: false,
+        perform_escaping: false,
+        write_document_declaration: false,
+        autopad_comments: false,
+        cdata_to_characters: true,
+        line_separator: Cow::Borrowed("\n"),
+        normalize_empty_elements: false,
+        ..Default::default()
+    };
+
+    let mut output_writer = xml::writer::EventWriter::new_with_config(&mut output, emitter_config);
 
     let mut level: usize = 0;
     let mut xml_ns_attrs = vec![];
     let mut exc_ns_stack = xml::namespace::NamespaceStack::default();
+
     for (i, event) in events.iter().enumerate() {
-        match match event {
+        let result = match event {
             xml::reader::XmlEvent::StartDocument { .. } => Ok(()),
             xml::reader::XmlEvent::EndDocument { .. } => Ok(()),
             xml::reader::XmlEvent::ProcessingInstruction { name, data } => {
@@ -61,6 +65,7 @@ pub fn canonical_rfc3076(
                         a.name.namespace.as_deref() == Some("http://www.w3.org/XML/1998/namespace")
                     })
                     .collect::<Vec<_>>();
+
                 let cur_xml_ns_attrs = xml_ns_attrs.clone();
                 xml_ns_attrs.push(new_xms_ns_attrs);
 
@@ -71,6 +76,7 @@ pub fn canonical_rfc3076(
                         .iter()
                         .map(|a| a.name.prefix.as_deref())
                         .collect::<Vec<_>>();
+
                     exc_ns_stack.push_empty();
                     exc_ns_stack.extend(
                         namespace
@@ -97,6 +103,7 @@ pub fn canonical_rfc3076(
                                 }
                             })
                             .collect::<Vec<_>>();
+
                         attributes
                             .iter()
                             .chain(
@@ -111,9 +118,10 @@ pub fn canonical_rfc3076(
                     } else {
                         attributes.iter().map(canon_attr_map).collect::<Vec<_>>()
                     };
+
                     mapped_attr.sort_by(|a, b| match (a.0.prefix, b.0.prefix) {
                         (None, None) => a.0.local_name.cmp(b.0.local_name),
-                        (None, Some(_)) => std::cmp::Ordering::Less,
+                        (None, Some(_)) => cmp::Ordering::Less,
                         (Some(_), Some(_)) => {
                             let a_ns = a.0.namespace.unwrap_or_default();
                             let b_ns = b.0.namespace.unwrap_or_default();
@@ -123,8 +131,9 @@ pub fn canonical_rfc3076(
                                 a_ns.cmp(b_ns)
                             }
                         }
-                        (Some(_), None) => std::cmp::Ordering::Greater,
+                        (Some(_), None) => cmp::Ordering::Greater,
                     });
+
                     output_writer.write(xml::writer::XmlEvent::StartElement {
                         name: name.borrow(),
                         attributes: mapped_attr
@@ -189,10 +198,8 @@ pub fn canonical_rfc3076(
                 }
             }
             xml::reader::XmlEvent::Whitespace(data) => {
-                if i >= offset && include_comments {
-                    output_writer.write(xml::writer::XmlEvent::Characters(
-                        &data.replace("\r\n", "\n"),
-                    ))
+                if i >= offset {
+                    output_writer.write(xml::writer::XmlEvent::Characters(data))
                 } else {
                     Ok(())
                 }
@@ -211,7 +218,9 @@ pub fn canonical_rfc3076(
                     Ok(())
                 }
             }
-        } {
+        };
+
+        match result {
             Ok(_) => {}
             Err(e) => return Err(e.to_string()),
         }
@@ -222,6 +231,8 @@ pub fn canonical_rfc3076(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn c14n_1() {
         let source_xml = r#"
