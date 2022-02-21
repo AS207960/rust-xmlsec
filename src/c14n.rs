@@ -8,11 +8,16 @@ fn canon_attr_map<'a>(a: &'a xml::attribute::OwnedAttribute) -> (xml::name::Name
             .replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace("\"", "&quot;")
-            .replace("\r", "&#xD;")
+            .replace("\r", "&#xD;"),
     )
 }
 
-pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: bool, offset: usize, exclusive: bool) -> Result<String, String> {
+pub fn canonical_rfc3076(
+    events: &[xml::reader::XmlEvent],
+    include_comments: bool,
+    offset: usize,
+    exclusive: bool,
+) -> Result<String, String> {
     let mut output = Vec::new();
     let mut output_writer = xml::writer::EventWriter::new_with_config(
         &mut output,
@@ -35,9 +40,7 @@ pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: boo
         match match event {
             xml::reader::XmlEvent::StartDocument { .. } => Ok(()),
             xml::reader::XmlEvent::EndDocument { .. } => Ok(()),
-            xml::reader::XmlEvent::ProcessingInstruction {
-                name, data
-            } => {
+            xml::reader::XmlEvent::ProcessingInstruction { name, data } => {
                 if i >= offset {
                     output_writer.write(xml::writer::XmlEvent::ProcessingInstruction {
                         name,
@@ -48,67 +51,89 @@ pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: boo
                 }
             }
             xml::reader::XmlEvent::StartElement {
-                name, attributes, namespace
+                name,
+                attributes,
+                namespace,
             } => {
-                let new_xms_ns_attrs =
-                    attributes
-                        .iter()
-                        .filter(|a| a.name.namespace.as_deref() == Some("http://www.w3.org/XML/1998/namespace"))
-                        .collect::<Vec<_>>();
+                let new_xms_ns_attrs = attributes
+                    .iter()
+                    .filter(|a| {
+                        a.name.namespace.as_deref() == Some("http://www.w3.org/XML/1998/namespace")
+                    })
+                    .collect::<Vec<_>>();
                 let cur_xml_ns_attrs = xml_ns_attrs.clone();
                 xml_ns_attrs.push(new_xms_ns_attrs);
 
                 if i >= offset {
                     level += 1;
 
-                    let attribute_prefixes = attributes.iter().map(|a| a.name.prefix.as_deref()).collect::<Vec<_>>();
+                    let attribute_prefixes = attributes
+                        .iter()
+                        .map(|a| a.name.prefix.as_deref())
+                        .collect::<Vec<_>>();
                     exc_ns_stack.push_empty();
-                    exc_ns_stack.extend(namespace.0.iter().filter(|n| {
-                        name.prefix.as_deref() == Some(&n.0) || attribute_prefixes.contains(&Some(n.1))
-                    }).map(|n| (n.0.as_str(), n.1.as_str())).collect::<Vec<_>>());
+                    exc_ns_stack.extend(
+                        namespace
+                            .0
+                            .iter()
+                            .filter(|n| {
+                                name.prefix.as_deref() == Some(&n.0)
+                                    || attribute_prefixes.contains(&Some(n.1))
+                            })
+                            .map(|n| (n.0.as_str(), n.1.as_str()))
+                            .collect::<Vec<_>>(),
+                    );
 
                     let mut mapped_attr = if i == offset && !exclusive {
-                        let existing_xms_ns_attrs = attributes.iter().filter_map(|a| if a.name.namespace.as_deref() == Some("http://www.w3.org/XML/1998/namespace") {
-                            Some(a.name.local_name.clone())
-                        } else {
-                            None
-                        }).collect::<Vec<_>>();
-                        attributes.iter().chain(
-                            cur_xml_ns_attrs.iter().flatten()
-                                .filter(|a| !existing_xms_ns_attrs.contains(&a.name.local_name))
-                                .map(|a| *a)
-                        ).map(canon_attr_map).collect()
+                        let existing_xms_ns_attrs = attributes
+                            .iter()
+                            .filter_map(|a| {
+                                if a.name.namespace.as_deref()
+                                    == Some("http://www.w3.org/XML/1998/namespace")
+                                {
+                                    Some(a.name.local_name.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>();
+                        attributes
+                            .iter()
+                            .chain(
+                                cur_xml_ns_attrs
+                                    .iter()
+                                    .flatten()
+                                    .filter(|a| !existing_xms_ns_attrs.contains(&a.name.local_name))
+                                    .map(|a| *a),
+                            )
+                            .map(canon_attr_map)
+                            .collect()
                     } else {
                         attributes.iter().map(canon_attr_map).collect::<Vec<_>>()
                     };
-                    mapped_attr.sort_by(|a, b| {
-                        match (a.0.prefix, b.0.prefix) {
-                            (None, None) => {
+                    mapped_attr.sort_by(|a, b| match (a.0.prefix, b.0.prefix) {
+                        (None, None) => a.0.local_name.cmp(b.0.local_name),
+                        (None, Some(_)) => std::cmp::Ordering::Less,
+                        (Some(_), Some(_)) => {
+                            let a_ns = a.0.namespace.unwrap_or_default();
+                            let b_ns = b.0.namespace.unwrap_or_default();
+                            if a_ns == b_ns {
                                 a.0.local_name.cmp(b.0.local_name)
-                            }
-                            (None, Some(_)) => {
-                                std::cmp::Ordering::Less
-                            }
-                            (Some(_), Some(_)) => {
-                                let a_ns = a.0.namespace.unwrap_or_default();
-                                let b_ns = b.0.namespace.unwrap_or_default();
-                                if a_ns == b_ns {
-                                    a.0.local_name.cmp(b.0.local_name)
-                                } else {
-                                    a_ns.cmp(b_ns)
-                                }
-                            }
-                            (Some(_), None) => {
-                                std::cmp::Ordering::Greater
+                            } else {
+                                a_ns.cmp(b_ns)
                             }
                         }
+                        (Some(_), None) => std::cmp::Ordering::Greater,
                     });
                     output_writer.write(xml::writer::XmlEvent::StartElement {
                         name: name.borrow(),
-                        attributes: mapped_attr.iter().map(|a| xml::attribute::Attribute {
-                            name: a.0,
-                            value: &a.1,
-                        }).collect(),
+                        attributes: mapped_attr
+                            .iter()
+                            .map(|a| xml::attribute::Attribute {
+                                name: a.0,
+                                value: &a.1,
+                            })
+                            .collect(),
                         namespace: if exclusive {
                             std::borrow::Cow::Owned(exc_ns_stack.squash())
                         } else {
@@ -119,9 +144,7 @@ pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: boo
                     Ok(())
                 }
             }
-            xml::reader::XmlEvent::EndElement {
-                name
-            } => {
+            xml::reader::XmlEvent::EndElement { name } => {
                 xml_ns_attrs.pop();
 
                 if i >= offset {
@@ -138,7 +161,7 @@ pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: boo
                             }
                             Ok(())
                         }
-                        Err(e) => Err(e)
+                        Err(e) => Err(e),
                     }
                 } else {
                     Ok(())
@@ -152,7 +175,7 @@ pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: boo
                             .replace("&", "&amp;")
                             .replace("<", "&lt;")
                             .replace(">", "&gt;")
-                            .replace("\r", "&#xD;")
+                            .replace("\r", "&#xD;"),
                     ))
                 } else {
                     Ok(())
@@ -160,9 +183,7 @@ pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: boo
             }
             xml::reader::XmlEvent::Comment(data) => {
                 if i >= offset && include_comments {
-                    output_writer.write(xml::writer::XmlEvent::Comment(
-                        &data.replace("\r\n", "\n")
-                    ))
+                    output_writer.write(xml::writer::XmlEvent::Comment(&data.replace("\r\n", "\n")))
                 } else {
                     Ok(())
                 }
@@ -170,7 +191,7 @@ pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: boo
             xml::reader::XmlEvent::Whitespace(data) => {
                 if i >= offset && include_comments {
                     output_writer.write(xml::writer::XmlEvent::Characters(
-                        &data.replace("\r\n", "\n")
+                        &data.replace("\r\n", "\n"),
                     ))
                 } else {
                     Ok(())
@@ -184,7 +205,7 @@ pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: boo
                             .replace("&", "&amp;")
                             .replace("<", "&lt;")
                             .replace(">", "&gt;")
-                            .replace("\r", "&#xD;")
+                            .replace("\r", "&#xD;"),
                     ))
                 } else {
                     Ok(())
@@ -192,7 +213,7 @@ pub fn canonical_rfc3076(events: &[xml::reader::XmlEvent], include_comments: boo
             }
         } {
             Ok(_) => {}
-            Err(e) => return Err(e.to_string())
+            Err(e) => return Err(e.to_string()),
         }
     }
 
@@ -228,7 +249,10 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
         let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
@@ -244,7 +268,10 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
         let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
@@ -261,7 +288,10 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
         let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
@@ -278,7 +308,10 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
         let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
@@ -294,7 +327,10 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
         let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
@@ -325,13 +361,14 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement {
-                name, ..
-            } = evt {
+            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "Doc" {
                     break;
                 }
@@ -363,13 +400,14 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement {
-                name, ..
-            } = evt {
+            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
@@ -404,13 +442,14 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement {
-                name, ..
-            } = evt {
+            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
@@ -442,13 +481,14 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement {
-                name, ..
-            } = evt {
+            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
@@ -483,13 +523,14 @@ mod tests {
                 .trim_whitespace(false)
                 .coalesce_characters(false)
                 .ignore_root_level_whitespace(true),
-        ).into_iter().collect::<Result<Vec<_>, _>>().unwrap();
+        )
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement {
-                name, ..
-            } = evt {
+            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }

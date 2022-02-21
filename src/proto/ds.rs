@@ -56,7 +56,8 @@ pub struct KeyInfo {
 pub struct Reference {
     #[serde(
         rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Transforms",
-        default, skip_serializing_if = "Option::is_none"
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub transforms: Option<Transforms>,
     #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:DigestMethod")]
@@ -67,7 +68,11 @@ pub struct Reference {
     pub id: Option<String>,
     #[serde(rename = "$attr:URI", default, skip_serializing_if = "Option::is_none")]
     pub uri: Option<String>,
-    #[serde(rename = "$attr:Type", default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "$attr:Type",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub ref_type: Option<String>,
 }
 
@@ -116,35 +121,41 @@ pub enum KeyValue {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DSAKeyValue {
     #[serde(
-    rename = "{http://www.w3.org/2000/09/xmldsig#}ds:P",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:P",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub p: Option<String>,
     #[serde(
-    rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Q",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Q",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub q: Option<String>,
     #[serde(
-    rename = "{http://www.w3.org/2000/09/xmldsig#}ds:G",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:G",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub g: Option<String>,
     #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Y")]
     pub y: String,
     #[serde(
-    rename = "{http://www.w3.org/2000/09/xmldsig#}ds:J",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:J",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub j: Option<String>,
     #[serde(
-    rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Seed",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Seed",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub seed: Option<String>,
     #[serde(
-    rename = "{http://www.w3.org/2000/09/xmldsig#}ds:PgenCounter",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:PgenCounter",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub pgen_counter: Option<String>,
 }
@@ -182,13 +193,15 @@ pub struct ECParams {
     #[serde(rename = "{http://www.w3.org/2009/xmldsig11#}ds11:Order")]
     pub order: String,
     #[serde(
-    rename = "{http://www.w3.org/2009/xmldsig11#}ds11:CoFactor",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2009/xmldsig11#}ds11:CoFactor",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub cofactor: Option<i64>,
     #[serde(
-    rename = "{http://www.w3.org/2009/xmldsig11#}ds11:ValidationData",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2009/xmldsig11#}ds11:ValidationData",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub validation_data: Option<ECValidationData>,
 }
@@ -284,13 +297,15 @@ pub struct X509IssuerSerial {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PGPData {
     #[serde(
-    rename = "{http://www.w3.org/2000/09/xmldsig#}ds:PGPKeyID",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:PGPKeyID",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub key_id: Option<String>,
     #[serde(
-    rename = "{http://www.w3.org/2000/09/xmldsig#}ds:PGPKeyPacket",
-    default, skip_serializing_if = "Option::is_none"
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:PGPKeyPacket",
+        default,
+        skip_serializing_if = "Option::is_none"
     )]
     pub key_packet: Option<String>,
 }
@@ -298,8 +313,9 @@ pub struct PGPData {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SPKIData {
     #[serde(
-    rename = "{http://www.w3.org/2000/09/xmldsig#}ds:SPKISexp",
-    default, skip_serializing_if = "Vec::is_empty"
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:SPKISexp",
+        default,
+        skip_serializing_if = "Vec::is_empty"
     )]
     pub sexp: Vec<String>,
 }
